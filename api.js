@@ -85,7 +85,8 @@ class Matrix {
     }
 
     getRow(whoIndex) {
-        return this.matrix.slice(whoIndex * this.amount, this.amount * (whoIndex + this.amount))
+        const rowOffset = whoIndex * this.amount
+        return this.matrix.slice(rowOffset, this.amount + rowOffset)
     }
 
     init() {

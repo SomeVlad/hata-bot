@@ -1,5 +1,5 @@
 const Telegraf = require('telegraf')
-const { token, ids, who, whom } = require('./config')
+const { token, ids, who, whom, isInDebtString } = require('./config')
 const api = require('./api')
 
 const bot = new Telegraf(token)
@@ -34,12 +34,7 @@ bot.hears(/сколько|скок/i, context => {
     const noFrom = fromIndex === -1
     const noTo = toIndex === -1
 
-    if (trolling) {
-        context.reply('NaN')
-        setTimeout(() => context.reply('Шутник, блядь.'), 5000)
-
-        return
-    }
+    if (noFrom && noTo || trolling) return
 
     if (noFrom || noTo) {
         context.reply(`Не поняла. 🤯`)
@@ -48,7 +43,6 @@ bot.hears(/сколько|скок/i, context => {
 
         return
     }
-
 
     const amount = api.getValue(fromIndex, toIndex)
     const mirrorAmount = api.getValue(toIndex, fromIndex)
@@ -60,6 +54,30 @@ bot.hears(/сколько|скок/i, context => {
     return context.reply(`${amount > 0 ? who[fromIndex] : who[toIndex]} торчит ${amount > 0 ? whom[toIndex] : whom[fromIndex]} ${amount > 0 ? amount : mirrorAmount}₽.`)
 })
 
+bot.hears(/кому/i, context => {
+    const { fromIndex } = context.parseMessage.getData(context)
+
+    if (fromIndex === -1) return
+
+    const row = api.getRow(fromIndex)
+    if (!row.length) return
+
+    const sumReducer = (accumulator, currentValue) => accumulator + currentValue
+    const sum = row.reduce(sumReducer)
+
+    if (sum === 0) {
+        context.reply(`${who[fromIndex]} никому ничего не ${isInDebtString(fromIndex)}.`)
+
+        return
+    }
+
+    row.map((amount, toIndex) => {
+        if (amount > 0) {
+            context.reply(`${who[fromIndex]} ${isInDebtString(fromIndex)} ${whom[toIndex]} ${amount}₽.`)
+        }
+    })
+})
+
 bot.hears(/должен|должна|вернул|вернула|отдал|отдала/i, context => {
     const matchedWord = context.match[0].toLowerCase()
     const debt = /должен|должна/.test(matchedWord)
@@ -68,6 +86,8 @@ bot.hears(/должен|должна|вернул|вернула|отдал|от
     const noFrom = fromIndex === -1
     const noTo = toIndex === -1
     const noAmount = !amount
+
+    if (noFrom && noTo) return
 
     if (trolling) {
         context.reply('Ебобо?')
@@ -96,7 +116,10 @@ bot.hears(/должен|должна|вернул|вернула|отдал|от
         return context.reply(`Долг возвращён, ${who[fromIndex]} и ${who[toIndex]} ничего друг другу не должны. 🤝`)
     }
 
-    return context.reply(`Теперь ${debtFrom > 0 ? who[fromIndex] : who[toIndex]} торчит ${debtFrom > 0 ? whom[toIndex] : whom[fromIndex]} ${debtFrom > 0 ? debtFrom : debtTo}₽.`)
+    const actualFrom = debtFrom > 0 ? fromIndex : toIndex
+    const actualTo = debtFrom > 0 ? toIndex : fromIndex
+    const actualDebt = debtFrom > 0 ? debtFrom : debtTo
+    return context.reply(`Теперь ${who[actualFrom]} ${isInDebtString(actualFrom)} ${whom[actualTo]} ${actualDebt}₽.`)
 })
 
 bot.hears(/алис/i, context => context.reply('🖕🏾'))
